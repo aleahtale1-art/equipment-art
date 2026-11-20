@@ -10,7 +10,7 @@
   const host = document.createElement("div");
   host.id = "bmr-mage-tools";
   const root = host.attachShadow({ mode: "open" });
-  root.innerHTML = "\n<style>\n:host{position:fixed;top:12px;left:26%;z-index:1000000;width:min(340px,calc(100vw - 24px));font:14px/1.4 system-ui,sans-serif;color:#f3ecdc}\n*,*::before,*::after{box-sizing:border-box}[hidden]{display:none!important}button,input,select{font:inherit;color:inherit}\nbutton{cursor:pointer;background:#272a29;border:1px solid #625846;border-radius:5px;padding:7px 10px}button:hover{background:#393b32}button:disabled{opacity:.5;cursor:default}button[aria-pressed=true]{border-color:#ebc578;background:#473b27;color:#ffdf9c}button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid #ebc578;outline-offset:2px}\n#launch{display:inline-flex;align-items:center;gap:18px;background:#202320;color:#ffdf9c;font-size:16px;font-weight:750;box-shadow:0 3px 12px #0007}\n#launch span{font-size:11px}#tools,section{margin-top:5px;background:#1b1d1c;border:1px solid #625846;border-radius:7px;box-shadow:0 6px 18px #0008}\n#tools{width:max-content;max-width:100%;min-width:185px;padding:4px}#tools button{display:flex;justify-content:space-between;gap:20px;width:100%;border-color:transparent;text-align:left}\nsection{max-height:calc(100dvh - 110px);overflow:auto;padding:13px}header,.actions{display:flex;align-items:center;gap:8px}header{justify-content:space-between;margin-bottom:8px}h2{font-size:16px;margin:0;color:#ffdf9c}\nlabel{display:block;margin-top:9px}select,input{display:block;width:100%;margin-top:4px;padding:6px 7px;border:1px solid #625846;border-radius:5px;background:#292c28}\n.sample{display:flex;align-items:center;gap:9px;margin:9px 0;color:#e0d6c3}.sample img{width:48px;height:48px;object-fit:contain;background:#111312;border-radius:4px}\n.actions{margin-top:10px}[role=status]{min-height:1.4em;color:#e5ca94;margin:7px 0 0;overflow-wrap:anywhere}\n@media(max-width:620px){:host{top:52px;left:12px}}\n</style>\n<button id=\"launch\" type=\"button\" aria-expanded=\"false\" aria-controls=\"tools\">Mage Tools <span aria-hidden=\"true\">&#9662;</span></button>\n<div id=\"tools\" role=\"group\" aria-label=\"Mage Tools\" hidden></div>\n<div id=\"panels\"></div>";
+  root.innerHTML = "\n<style>\n:host{position:fixed;top:12px;left:26%;z-index:1000000;width:min(340px,calc(100vw - 24px));font:14px/1.4 system-ui,sans-serif;color:#f3ecdc}\n*,*::before,*::after{box-sizing:border-box}[hidden]{display:none!important}button,input,select,textarea{font:inherit;color:inherit}\nbutton{cursor:pointer;background:#272a29;border:1px solid #625846;border-radius:5px;padding:7px 10px}button:hover{background:#393b32}button:disabled{opacity:.5;cursor:default}button[aria-pressed=true]{border-color:#ebc578;background:#473b27;color:#ffdf9c}button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid #ebc578;outline-offset:2px}\n#launch{display:inline-flex;align-items:center;gap:18px;background:#202320;color:#ffdf9c;font-size:16px;font-weight:750;box-shadow:0 3px 12px #0007}\n#launch span{font-size:11px}#tools,section{margin-top:5px;background:#1b1d1c;border:1px solid #625846;border-radius:7px;box-shadow:0 6px 18px #0008}\n#tools{width:max-content;max-width:100%;min-width:185px;padding:4px}#tools button{display:flex;justify-content:space-between;gap:20px;width:100%;border-color:transparent;text-align:left}\nsection{max-height:calc(100dvh - 110px);overflow:auto;padding:13px}header,.actions{display:flex;align-items:center;gap:8px}header{justify-content:space-between;margin-bottom:8px}h2{font-size:16px;margin:0;color:#ffdf9c}\nlabel{display:block;margin-top:9px}select,input,textarea{display:block;width:100%;margin-top:4px;padding:6px 7px;border:1px solid #625846;border-radius:5px;background:#292c28}\n.sample{display:flex;align-items:center;gap:9px;margin:9px 0;color:#e0d6c3}.sample img{width:48px;height:48px;object-fit:contain;background:#111312;border-radius:4px}\n.actions{margin-top:10px}#character-dm-target{margin:8px 0 0;color:#e0d6c3}textarea{resize:vertical}.actions{flex-wrap:wrap}[role=status]{min-height:1.4em;color:#e5ca94;margin:7px 0 0;overflow-wrap:anywhere}\n@media(max-width:620px){:host{top:52px;left:12px}}\n</style>\n<button id=\"launch\" type=\"button\" aria-expanded=\"false\" aria-controls=\"tools\">Mage Tools <span aria-hidden=\"true\">&#9662;</span></button>\n<div id=\"tools\" role=\"group\" aria-label=\"Mage Tools\" hidden></div>\n<div id=\"panels\"></div>";
   const el = id => root.getElementById(id);
   const launch = el("launch");
   const tools = el("tools");
@@ -54,9 +54,10 @@
     showTools(false);
     launch.focus();
   });
+  const shared = {};
   const mount = () => {
     document.body.append(host);
-    window.bmrMageTools = { open };
+    window.bmrMageTools = { open, ...shared };
     open();
   };
 
@@ -70,28 +71,86 @@
   };
 
 
+  const macroLiteral = value => JSON.stringify(value).replace(/[{}]/g, char => char === "{" ? "\\u007b" : "\\u007d");
+  const draftMarkup = prefix =>
+    '<div id="' + prefix + '-dm-draft" hidden><label for="' + prefix + '-dm-text">Message Cast DM</label><textarea id="' + prefix + '-dm-text" rows="3" readonly></textarea></div>';
+  const copyDraft = async (prefix, text, status) => {
+    const draft = el(prefix + "-dm-draft");
+    const field = el(prefix + "-dm-text");
+    field.value = text;
+    draft.hidden = false;
+    try {
+      await navigator.clipboard.writeText(text);
+      if (!draft.hidden && field.value === text) status.textContent = "Copied. Paste it into your RP partner’s Message Cast DM.";
+    } catch {
+      if (!draft.hidden && field.value === text) {
+        field.focus();
+        field.select();
+        status.textContent = "Copy the selected text and paste it into your RP partner’s DM.";
+      }
+    }
+  };
+
   const addCharacterTool = () => {
     el("panels").insertAdjacentHTML("beforeend", [
       '<section id="character-panel" aria-labelledby="character-heading" hidden>',
       '<header><h2 id="character-heading">Character Image</h2><button id="character-back" type="button" aria-label="Back to Mage Tools">Back</button></header>',
       '<div class="actions" role="group" aria-label="Character">',
       '<button id="character-me" type="button" aria-pressed="true">Me</button>',
-      '<button id="character-opponent" type="button" aria-pressed="false">Opponent</button></div>',
+      '<button id="character-opponent" type="button" aria-pressed="false">Opponent</button>',
+      '<button id="character-background" type="button" aria-pressed="false">Background</button></div>',
       '<form id="character-form" novalidate>',
       '<label for="character-url">Direct HTTPS image link</label><input id="character-url" type="url" autocomplete="off" placeholder="https://">',
-      '<div class="actions"><button id="character-apply" type="submit">Apply image</button></div>',
+      '<div class="actions"><button id="character-apply" type="submit">Apply image</button><button id="character-copy" type="button">Copy for DM</button><button id="background-reset" type="button" hidden>Restore background</button></div>',
+      '<p id="character-dm-target">DM target: the recipient’s character.</p>',
+      draftMarkup("character"),
       '<p id="character-status" role="status"></p></form></section>',
     ].join(""));
     const panel = el("character-panel");
     const field = el("character-url");
     const status = el("character-status");
     const apply = el("character-apply");
-    const targets = [el("character-me"), el("character-opponent")];
+    const copy = el("character-copy");
+    const dmTarget = el("character-dm-target");
+    const draft = el("character-dm-draft");
+    const portraitOptions = { scale: "1,1", backgroundSize: "auto 100%" };
+    const targets = [el("character-me"), el("character-opponent"), el("character-background")];
+    const restore = el("background-reset");
+    let backgroundStyle;
+    let backgroundUrl = "";
+    const resetBackground = () => {
+      backgroundStyle?.remove();
+      backgroundStyle = null;
+      backgroundUrl = "";
+    };
+    const setBackground = url => {
+      if (!document.querySelector("#background_wrapper > div")) return false;
+      if (!backgroundStyle) {
+        backgroundStyle = document.createElement("style");
+        document.head.append(backgroundStyle);
+      }
+      // Override the game’s room image itself so character sprites keep their normal layers.
+      backgroundStyle.textContent = "#background_wrapper > div {" +
+        "background-image: url(" + JSON.stringify(url) + ") !important;" +
+        "background-size: cover !important;" +
+        "background-position: center !important;" +
+        "background-repeat: no-repeat !important;}";
+      backgroundUrl = url;
+      return true;
+    };
     let target = 0;
     let request = 0;
     targets.forEach((button, index) => {
       button.onclick = () => {
         target = index;
+        restore.hidden = target !== 2;
+        dmTarget.textContent = [
+          "DM target: the recipient’s character.",
+          "DM target: the recipient’s opponent.",
+          "DM target: the recipient’s room background.",
+        ][target];
+        draft.hidden = true;
+        field.value = target === 2 ? backgroundUrl : "";
         request++;
         apply.disabled = false;
         status.textContent = "";
@@ -101,9 +160,49 @@
         field.focus();
       };
     });
+
+    copy.onclick = () => {
+      const url = httpsImage(field.value.trim());
+      if (!url) {
+        status.textContent = "Paste a direct HTTPS image link.";
+        return;
+      }
+      const call = target === 2
+        ? "void window.bmrMageTools?.applySharedBackground(" + macroLiteral(url) + ")"
+        : "MESSAGECAST.changeCharacterImage(" + target + "," + macroLiteral(url) + "," + JSON.stringify(portraitOptions) + ")";
+      return copyDraft("character", "$" + "{" + call + ";}", status);
+    };
+    shared.applySharedBackground = value => {
+      const url = httpsImage(value);
+      if (!url) return;
+      const ticket = ++request;
+      apply.disabled = false;
+      const image = new Image();
+      image.onload = () => {
+        if (ticket === request && setBackground(url) && target === 2) {
+          draft.hidden = true;
+          field.value = url;
+          status.textContent = "Shared background applied.";
+        }
+      };
+      image.src = url;
+    };
+    field.addEventListener("input", () => {
+      if (!draft.hidden) {
+        draft.hidden = true;
+        status.textContent = "";
+      }
+    });
+    restore.onclick = () => {
+      request++;
+      apply.disabled = false;
+      resetBackground();
+      field.value = "";
+      status.textContent = "Original background restored.";
+    };
     el("character-back").onclick = () => {
       open();
-      tools.lastElementChild?.focus();
+      launch.focus();
     };
     el("character-form").onsubmit = async event => {
       event.preventDefault();
@@ -114,7 +213,7 @@
         status.textContent = "Paste a direct HTTPS image link.";
         return;
       }
-      if (typeof cast?.changeCharacterImage !== "function") {
+      if (target !== 2 && typeof cast?.changeCharacterImage !== "function") {
         status.textContent = "Run your Message Cast macro first, then try again.";
         return;
       }
@@ -132,10 +231,13 @@
       test.onload = async () => {
         if (ticket !== request) return;
         try {
-          const result = await cast.changeCharacterImage(character, url, {
-            scale: "1,1",
-            backgroundSize: "auto 100%",
-          });
+          if (character === 2) {
+            status.textContent = setBackground(url)
+              ? "Room background applied."
+              : "No room background is available.";
+            return;
+          }
+          const result = await cast.changeCharacterImage(character, url, portraitOptions);
           if (ticket === request) {
             status.textContent = result === false
               ? "Message Cast could not change the selected character image."
@@ -214,6 +316,8 @@
     // The controls also work for the current page when storage is unavailable.
   }
   const artwork = Object.create(null);
+  const sharedArtwork = Object.create(null);
+  const artworkFor = slot => sharedArtwork[slot] || artwork[slot];
   for (const slot of slotNames) {
     const url = httpsImage((saved ?? existing)[slot]);
     if (url) artwork[slot] = url;
@@ -229,7 +333,7 @@
       ? active.o : active;
     hooks[name] = function (item, ...args) {
       const slot = item?.id == null ? undefined : slotNames.find(key => String(itemId(key)) === String(item.id));
-      return (slot && artwork[slot]) || original[name].call(this, item, ...args);
+      return (slot && artworkFor(slot)) || original[name].call(this, item, ...args);
     };
     images[name] = hooks[name];
   }
@@ -239,7 +343,8 @@
     '<label for="slot">Equipment slot</label><select id="slot"></select>',
     '<div class="sample"><img id="preview" alt=""><span id="item"></span></div>',
     '<label for="url">Direct HTTPS image link</label><input id="url" type="url" autocomplete="off" placeholder="https://…">',
-    '<div class="actions"><button id="apply">Apply image</button><button id="reset">Reset slot</button></div>',
+    '<div class="actions"><button id="apply">Apply image</button><button id="equipment-copy" type="button">Copy for DM</button><button id="reset">Reset slot</button></div>',
+    draftMarkup("equipment"),
     '<p id="status" role="status"></p></section>',
   ].join("");
 
@@ -249,13 +354,14 @@
   const apply = el("apply");
   const reset = el("reset");
   const status = el("status");
+  const equipmentDraft = el("equipment-dm-draft");
   let attempt = 0;
   const iconFor = slot => document.querySelector(".equipment .item_slot.accessory." + slot)?.firstElementChild;
   const showIcon = slot => {
     const icon = iconFor(slot);
     const item = itemIn(slot);
     if (!icon || !item) return;
-    const url = artwork[slot] || original.getWornItemImage.call(images, item);
+    const url = artworkFor(slot) || original.getWornItemImage.call(images, item);
     if (typeof url === "string" && url) icon.style.backgroundImage = "url(" + JSON.stringify(url) + ")";
   };
   const redraw = () => {
@@ -277,7 +383,7 @@
       const item = itemIn(slot);
       const option = document.createElement("option");
       option.value = slot;
-      option.textContent = slots[slot] + (artwork[slot] ? " • custom" : "") + (item ? "" : " · empty");
+      option.textContent = slots[slot] + (artworkFor(slot) ? " • custom" : "") + (item ? "" : " · empty");
       select.append(option);
     }
     select.value = selected;
@@ -287,9 +393,9 @@
     if (url) preview.src = url;
     else preview.removeAttribute("src");
     el("item").textContent = item?.base?.item_name ?? "No item equipped";
-    field.value = artwork[selected] || "";
+    field.value = artworkFor(selected) || "";
     apply.disabled = !item;
-    reset.disabled = !artwork[selected];
+    reset.disabled = !artworkFor(selected);
   };
 
   const equipment = {
@@ -309,9 +415,51 @@
     tools.firstElementChild?.focus();
   };
   select.onchange = () => {
+    equipmentDraft.hidden = true;
     attempt++;
     status.textContent = "";
     render();
+  };
+
+  el("equipment-copy").onclick = () => {
+    const slot = select.value;
+    const url = httpsImage(field.value.trim());
+    if (!Object.hasOwn(slots, slot) || !url) {
+      status.textContent = "Choose a slot and paste a direct HTTPS image link.";
+      return;
+    }
+    const call = "void window.bmrMageTools?.applySharedEquipment(" + macroLiteral(slot) + "," + macroLiteral(url) + ")";
+    return copyDraft("equipment", "$" + "{" + call + ";}", status);
+  };
+  field.addEventListener("input", () => {
+    if (!equipmentDraft.hidden) {
+      equipmentDraft.hidden = true;
+      status.textContent = "";
+    }
+  });
+  const incomingEquipment = Object.create(null);
+  shared.applySharedEquipment = (slot, value) => {
+    if (typeof slot !== "string" || !Object.hasOwn(slots, slot) || !itemIn(slot)) return;
+    const url = httpsImage(value);
+    if (!url) return;
+    const item = itemId(slot);
+    const image = new Image();
+    incomingEquipment[slot] = image;
+    image.onload = () => {
+      if (incomingEquipment[slot] !== image || itemId(slot) !== item) return;
+      delete incomingEquipment[slot];
+      sharedArtwork[slot] = url;
+      redraw();
+      if (select.value === slot) {
+        equipmentDraft.hidden = true;
+        render();
+        status.textContent = "Shared image applied to " + slots[slot] + ".";
+      }
+    };
+    image.onerror = () => {
+      if (incomingEquipment[slot] === image) delete incomingEquipment[slot];
+    };
+    image.src = url;
   };
   field.onkeydown = event => {
     if (event.key === "Enter") {
@@ -322,6 +470,7 @@
   apply.onclick = () => {
     const slot = select.value;
     const url = httpsImage(field.value.trim());
+    equipmentDraft.hidden = true;
     if (!url || !itemIn(slot)) {
       status.textContent = "Choose an equipped slot and paste a valid HTTPS link.";
       return;
@@ -331,6 +480,8 @@
     status.textContent = "Checking the image…";
     test.onload = () => {
       if (ticket !== attempt) return;
+      delete incomingEquipment[slot];
+      delete sharedArtwork[slot];
       artwork[slot] = url;
       const stored = save();
       redraw();
@@ -345,6 +496,15 @@
   reset.onclick = () => {
     attempt++;
     const slot = select.value;
+    equipmentDraft.hidden = true;
+    delete incomingEquipment[slot];
+    if (sharedArtwork[slot]) {
+      delete sharedArtwork[slot];
+      redraw();
+      render();
+      status.textContent = "Shared slot image cleared.";
+      return;
+    }
     delete artwork[slot];
     const stored = save();
     redraw();
